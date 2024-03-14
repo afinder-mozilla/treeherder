@@ -260,6 +260,13 @@ const GraphTooltip = ({
                   />
                   {` Alert # ${dataPointDetails.alertSummary.id}`}
                 </Link>
+                &nbsp;
+                <Clipboard
+                  text={`${dataPointDetails.alertSummary.id}`}
+                  description="Alert ID"
+                  outline
+                />
+                &nbsp;
                 <span className="text-muted">
                   {` - ${alertStatus} `}
                   {alert && alert.related_summary_id && (
