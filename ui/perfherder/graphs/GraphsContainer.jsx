@@ -34,6 +34,7 @@ class GraphsContainer extends React.Component {
     super(props);
     this.leftChartPadding = 25;
     this.rightChartPadding = 10;
+    this.initialRuns = {};
     const testData = props.testData || [];
     const scatterPlotData = flatMap(testData, (item) =>
       item.visible ? item.data : [],
@@ -55,6 +56,7 @@ class GraphsContainer extends React.Component {
     const { scatterPlotData } = this.state;
     const zoomDomain = this.initZoomDomain(scatterPlotData);
     this.addHighlights();
+    this.buildInitialRunsCache();
     if (selectedDataPoint) {
       this.verifySelectedDataPoint();
     }
@@ -101,6 +103,77 @@ class GraphsContainer extends React.Component {
       this.verifySelectedDataPoint();
     }
   }
+
+  buildInitialRunsCache = () => {
+    const initialRuns = {};
+
+    for (const series of this.props.testData) {
+      const signatureId = series.signature_id;
+
+      if (!initialRuns[signatureId]) {
+        initialRuns[signatureId] = {};
+      }
+
+      const signatureRuns = initialRuns[signatureId];
+
+      for (const point of series.data) {
+        if (!point.pushId || !point.retrigger_time) {
+          continue;
+        }
+
+        const time = new Date(point.retrigger_time).getTime();
+
+        if (Number.isNaN(time)) {
+          continue;
+        }
+
+        const pushId = point.pushId;
+
+        if (!signatureRuns[pushId]) {
+          signatureRuns[pushId] = {
+            firstDataPointId: point.dataPointId,
+            firstTimestamp: time,
+            retriggerCount: 1,
+          };
+          continue;
+        }
+
+        const pushData = signatureRuns[pushId];
+
+        pushData.retriggerCount += 1;
+
+        if (time < pushData.firstTimestamp) {
+          pushData.firstTimestamp = time;
+          pushData.firstDataPointId = point.dataPointId;
+        }
+      }
+    }
+
+    this.initialRuns = initialRuns;
+  };
+
+  isInitialWithRetriggers = (datum) => {
+    if (!datum?.signature_id || !datum?.pushId) {
+      return false;
+    }
+
+    const signatureRuns = this.initialRuns?.[datum.signature_id];
+
+    if (!signatureRuns) {
+      return false;
+    }
+
+    const pushData = signatureRuns[datum.pushId];
+
+    if (!pushData) {
+      return false;
+    }
+
+    return (
+      pushData.retriggerCount > 1 &&
+      pushData.firstDataPointId === datum.dataPointId
+    );
+  };
 
   // limits for the zoomDomain of VictoryChart
   initZoomDomain = (plotData) => {
@@ -178,6 +251,7 @@ class GraphsContainer extends React.Component {
       item.visible ? item.data : [],
     );
     this.addHighlights();
+    this.buildInitialRunsCache();
     if (scatterPlotData.length) {
       zoomDomain = this.updateZoomDomain(scatterPlotData);
     }
@@ -325,6 +399,7 @@ class GraphsContainer extends React.Component {
       highlightedRevisions = ['', ''],
       highlightChangelogData,
       highlightCommonAlerts,
+      highlightInitialDataPoints,
     } = this.props;
     const {
       highlights,
@@ -534,6 +609,23 @@ class GraphsContainer extends React.Component {
                     />
                   )}
 
+                  {highlightInitialDataPoints && (
+                    <VictoryScatter
+                      name="retrigger-ring"
+                      data={scatterPlotData.filter((d) =>
+                        this.isInitialWithRetriggers(d),
+                      )}
+                      size={() => DOT_SIZE + 3}
+                      style={{
+                        data: {
+                          fill: 'transparent',
+                          stroke:({ datum }) => datum.z,
+                          strokeWidth: 2,
+                        },
+                      }}
+                    />
+                  )}
+
                   <VictoryScatter
                     name="scatter-plot"
                     symbol={({ datum }) => (datum._z ? datum._z[0] : 'circle')}
@@ -554,9 +646,7 @@ class GraphsContainer extends React.Component {
                           highlightPoints
                             ? 0.3
                             : 100,
-                        stroke: ({ datum }) => {
-                          return datum.z;
-                        },
+                        stroke: ({ datum }) => datum.z,
                         strokeWidth: ({ datum }) =>
                           (datum.alertSummary ||
                             hasHighlightedRevision(datum)) &&
@@ -737,6 +827,7 @@ GraphsContainer.propTypes = {
   zoom: PropTypes.shape({}),
   selectedDataPoint: PropTypes.shape({}),
   highlightAlerts: PropTypes.bool,
+  highlightInitialDataPoints: PropTypes.bool,
   highlightedRevisions: PropTypes.oneOfType([
     PropTypes.string,
     PropTypes.arrayOf(PropTypes.string),
