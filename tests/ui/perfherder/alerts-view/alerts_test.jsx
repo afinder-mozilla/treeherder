@@ -16,6 +16,7 @@ import {
   alertBackfillResultVisual,
   alertBackfillResultStatusMap,
   notSupportedAlertFiltersMessage,
+  summaryStatusMap,
 } from '../../../../ui/perfherder/perf-helpers/constants';
 import repos from '../../mock/repositories';
 import { getApiUrl } from '../../../../ui/helpers/url';
@@ -1187,6 +1188,12 @@ test('Prev push revision is displayed in dropdown', async () => {
     const prevPush = getAllByTestId('prev-push-revision');
     expect(prevPush[0]).toHaveTextContent(prevPushRevision);
   });
+});
+
+test('"untriaged regressions" and "untriaged improvements" options appear in the status dropdown', () => {
+  const statusOptions = Object.keys(summaryStatusMap);
+  expect(statusOptions).toContain('untriaged regressions');
+  expect(statusOptions).toContain('untriaged improvements');
 });
 
 test('Current push revision is displayed in dropdown', async () => {

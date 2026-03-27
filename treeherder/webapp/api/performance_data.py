@@ -414,6 +414,8 @@ class PerformanceAlertSummaryFilter(django_filters.FilterSet):
     filter_text = django_filters.CharFilter(method="_filter_text")
     hide_improvements = django_filters.BooleanFilter(method="_hide_improvements")
     hide_related_and_invalid = django_filters.BooleanFilter(method="_hide_related_and_invalid")
+    untriaged_regressions = django_filters.BooleanFilter(method="_untriaged_regressions")
+    untriaged_improvements = django_filters.BooleanFilter(method="_untriaged_improvements")
     with_assignee = django_filters.CharFilter(method="_with_assignee")
     timerange = django_filters.NumberFilter(method="_timerange")
     show_sheriffed_frameworks = django_filters.BooleanFilter(method="_show_sheriffed_frameworks")
@@ -480,6 +482,22 @@ class PerformanceAlertSummaryFilter(django_filters.FilterSet):
             ]
         )
 
+    def _untriaged_regressions(self, queryset, name, value):
+        if value:
+            return queryset.filter(
+                alerts__is_regression=True,
+                alerts__status=PerformanceAlert.UNTRIAGED,
+            ).distinct()
+        return queryset
+
+    def _untriaged_improvements(self, queryset, name, value):
+        if value:
+            return queryset.filter(
+                alerts__is_regression=False,
+                alerts__status=PerformanceAlert.UNTRIAGED,
+            ).distinct()
+        return queryset
+
     def _with_assignee(self, queryset, name, value):
         return queryset.filter(assignee__username=value)
 
@@ -502,6 +520,8 @@ class PerformanceAlertSummaryFilter(django_filters.FilterSet):
             "filter_text",
             "hide_improvements",
             "hide_related_and_invalid",
+            "untriaged_regressions",
+            "untriaged_improvements",
             "with_assignee",
             "timerange",
         ]
