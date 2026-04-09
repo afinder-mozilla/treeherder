@@ -13,8 +13,6 @@ export const thBaseUrl = 'https://treeherder.mozilla.org/';
 
 export const bzBaseUrl = 'https://bugzilla.mozilla.org/';
 
-export const landoBaseUrl = 'https://api.lando.services.mozilla.com/';
-
 export const bzComponentEndpoint = '/bugzilla-component/';
 
 export const bugsEndpoint = '/failures/';
@@ -287,6 +285,18 @@ export const getPerfCompareOvertimeSubtestsURL = function getPerfCompareOvertime
   )}`;
 };
 
-export const getLandoJobsUrl = function getLandoJobsUrl(landoCommitID) {
-  return `${landoBaseUrl}${landoLandingJobsEndPoint}${landoCommitID}`;
+export const getLandoJobsUrl = function getLandoJobsUrl(
+  landoInstance,
+  landoCommitID,
+) {
+  const instances = {
+    'lando-dev': 'api.dev.lando.nonprod.cloudops.mozgcp.net',
+    'lando-dev-2025': 'lando-dev.allizom.org',
+    'lando-prod': 'api.lando.services.mozilla.com',
+    'lando-prod-2025': 'lando.moz.tools',
+  };
+  const defaultBaseUrl = instances['lando-prod'];
+  const landoBaseUrl = instances[landoInstance] ?? defaultBaseUrl;
+  const commitID = Number.parseInt(landoCommitID);
+  return `https://${landoBaseUrl}/${landoLandingJobsEndPoint}${commitID}`;
 };
