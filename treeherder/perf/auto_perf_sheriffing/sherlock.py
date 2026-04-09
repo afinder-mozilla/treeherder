@@ -433,8 +433,8 @@ class Sherlock:
                     "new_value": detection.new_value,
                     "prev_median": detection.optional_detection_info["Interpolated Median"][0],
                     "new_median": detection.optional_detection_info["Interpolated Median"][1],
-                    "prev_p90": detection.optional_detection_info["Interpolated p05"][0],
-                    "new_p90": detection.optional_detection_info["Interpolated p05"][1],
+                    "prev_p05": detection.optional_detection_info["Interpolated p05"][0],
+                    "new_p05": detection.optional_detection_info["Interpolated p05"][1],
                     "prev_p95": detection.optional_detection_info["Interpolated p95"][0],
                     "new_p95": detection.optional_detection_info["Interpolated p95"][1],
                 },
@@ -444,6 +444,7 @@ class Sherlock:
                 telemetry_alert=detection_alert,
                 telemetry_alert_summary=detection_summary,
                 telemetry_signature=probe_signature,
+                optional_detection_info=detection.optional_detection_info,
             )
 
     def _get_metric_definitions(self) -> list[dict]:
