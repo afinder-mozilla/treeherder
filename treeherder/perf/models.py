@@ -833,7 +833,6 @@ class PerformanceAlertTesting(PerformanceAlertBase):
         unique_together = (
             ("summary", "series_signature"),
             ("summary", "telemetry_series_signature"),
-            ("summary", "detection_method"),
         )
 
 
