@@ -33,7 +33,7 @@ import {
 } from '../../taskcluster-auth-callback/constants';
 import { RevisionList } from '../../shared/RevisionList';
 import { Revision } from '../../shared/Revision';
-import { getJobCount, getTaskRunStr } from '../../helpers/job';
+import { defaultJobCount, getJobCount, getTaskRunStr } from '../../helpers/job';
 
 import FuzzyJobFinder from './FuzzyJobFinder';
 import PushHeader from './PushHeader';
@@ -116,18 +116,7 @@ function Push({
   const [runnableVisible, setRunnableVisible] = useState(false);
   const [selectedRunnableJobs, setSelectedRunnableJobs] = useState([]);
   const [watched, setWatched] = useState('none');
-  const [jobCounts, setJobCounts] = useState({
-    build_failed: 0,
-    completed: 0,
-    fixedByCommit: 0,
-    lint_failed: 0,
-    pending: 0,
-    running: 0,
-    test_failed: 0,
-    intermittentBuild: 0,
-    intermittentLint: 0,
-    intermittentTests: 0,
-  });
+  const [jobCounts, setJobCounts] = useState(defaultJobCount);
   const [pushGroupState, setPushGroupState] = useState('collapsed');
   const [collapsed, setCollapsed] = useState(collapsedPushes.includes(push.id));
   const [filteredTryPush, setFilteredTryPush] = useState(false);
@@ -326,16 +315,6 @@ function Push({
     // Re-map jobs with the new manifests
     mapPushJobs(jobListRef.current);
   }, [currentRepo.name, push.revision, mapPushJobs]);
-
-  const testForFilteredTry = useCallback(() => {
-    const filterParams = ['revision', 'author'];
-    const urlParams = new URLSearchParams(location.search);
-
-    const isFiltered =
-      filterParams.some((f) => urlParams.has(f)) && currentRepo.name === 'try';
-
-    setFilteredTryPush(isFiltered);
-  }, [currentRepo.name, location]);
 
   const handleUrlChanges = useCallback(async () => {
     const allParams = getAllUrlParams();
@@ -580,16 +559,12 @@ function Push({
       promises.push(fetchTestManifests());
     }
 
-    Promise.all(promises).then(() => {
-      testForFilteredTry();
-    });
-
     window.addEventListener(thEvents.applyNewJobs, handleApplyNewJobs);
 
     return () => {
       window.removeEventListener(thEvents.applyNewJobs, handleApplyNewJobs);
     };
-  }, [handleApplyNewJobs, fetchJobs, fetchTestManifests, testForFilteredTry]);
+  }, [handleApplyNewJobs, fetchJobs, fetchTestManifests]);
 
   // componentDidUpdate - show notifications
   useEffect(() => {
@@ -599,8 +574,14 @@ function Push({
 
   // componentDidUpdate - test for filtered try
   useEffect(() => {
-    testForFilteredTry();
-  }, [testForFilteredTry]);
+    const filterParams = ['revision', 'author'];
+    const urlParams = new URLSearchParams(location.search);
+
+    const isFiltered =
+      filterParams.some((f) => urlParams.has(f)) && currentRepo.name === 'try';
+
+    setFilteredTryPush(isFiltered);
+  }, [location.search]);
 
   // componentDidUpdate - handle URL changes
   useEffect(() => {
