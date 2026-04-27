@@ -348,7 +348,7 @@ function AlertsView({
     const prevParams = parseQueryParams(prevLocationSearch.current);
     prevLocationSearch.current = location.search;
 
-    if (
+    const filtersChanged =
       params.id !== prevParams.id ||
       params.status !== prevParams.status ||
       params.framework !== prevParams.framework ||
@@ -356,17 +356,38 @@ function AlertsView({
       params.hideDwnToInv !== prevParams.hideDwnToInv ||
       params.hideAssignedToOthers !== prevParams.hideAssignedToOthers ||
       params.monitoredAlerts !== prevParams.monitoredAlerts
-    ) {
+      
+    // check if page displays an alerts list or a specific alert
+    const isDetailMode = Boolean(params.id);
+
+    if (filtersChanged) {
       const newId = params.id || null;
       const newFilters = getFiltersFromParams(params);
       setId(newId);
       setFilters(newFilters);
       // Need to fetch with the new values
+      
       idRef.current = newId;
       filtersRef.current = newFilters;
-      fetchAlertSummaries(newId);
-    } else if (params.page && params.page !== prevParams.page) {
-      fetchAlertSummaries(undefined, false, parseInt(params.page, 10));
+      
+      if (isDetailMode) {
+        fetchAlertSummaries(newId, false);
+      } else {
+        const nextPage = 1;
+
+        setPage(nextPage);
+        pageRef.current = nextPage;
+
+        fetchAlertSummaries(newId, false, nextPage);
+      }
+    } else {
+      const nextPage = parseInt(params.page, 10) || 1;
+      const prevPage = parseInt(prevParams.page, 10) || 1;
+
+      if (!isDetailMode && nextPage !== prevPage) {
+        pageRef.current = nextPage;
+        fetchAlertSummaries(undefined, false, nextPage);
+      }
     }
   }, [location.search, getFiltersFromParams, fetchAlertSummaries]);
 
