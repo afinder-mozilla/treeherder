@@ -397,7 +397,7 @@ class PerformanceAlertSummaryBase(models.Model):
                 update_fields = {"triage_due_date"}.union(update_fields)
 
         bug_due = calculate_time_to(self.created, BUG_DAYS)
-        if self.bug_due_date != bug_due:
+        if self.bug_due_date is None or self.bug_due_date < bug_due:
             self.bug_due_date = bug_due
 
             if update_fields is not None:
@@ -671,6 +671,7 @@ class PerformanceAlert(PerformanceAlertBase):
     def save(self, *args, **kwargs):
         # validate that we set a status that makes sense for presence
         # or absence of a related summary
+        was_created = self._state.adding
         if self.related_summary and self.status not in self.RELATIONAL_STATUS_IDS:
             raise ValidationError(
                 "Related summary set but status not in '{}'!".format(
@@ -699,7 +700,11 @@ class PerformanceAlert(PerformanceAlertBase):
         super().save(*args, **kwargs)
 
         # check to see if we need to update the summary statuses
-
+        if was_created:
+            new_due = calculate_time_to(self.created, BUG_DAYS)
+            if self.summary.bug_due_date is None or self.summary.bug_due_date < new_due:
+                self.summary.bug_due_date = new_due
+                self.summary.save(update_fields={"bug_due_date"})
         # just forward the explicit database
         # so the summary properly updates there
         using = kwargs.get("using", None)
