@@ -260,6 +260,18 @@ describe('getStatus', () => {
 
     expect(result).toBe('untriaged');
   });
+
+  it('handles untriaged regressions status', () => {
+    const result = getStatus(summaryStatusMap['untriaged regressions']);
+
+    expect(result).toBe('untriaged regressions');
+  });
+
+  it('handles untriaged improvements status', () => {
+    const result = getStatus(summaryStatusMap['untriaged improvements']);
+
+    expect(result).toBe('untriaged improvements');
+  });
 });
 
 describe('containsText', () => {
