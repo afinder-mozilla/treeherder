@@ -703,3 +703,201 @@ def test_filter_text_accounts_for_related_alerts_also(
     assert summary_id in summary_ids
     # also ensure original & related summary are both fetched
     assert len(summary_ids) == 2
+
+
+def test_alert_summaries_filter_by_id(client, test_perf_alert_summary, test_perf_alert_summary_2):
+    resp = client.get(
+        reverse("performance-alert-summaries-list"),
+        data={"id": test_perf_alert_summary.id},
+    )
+    assert resp.status_code == 200
+
+    retrieved_summaries = resp.json()["results"]
+    summary_ids = [summary["id"] for summary in retrieved_summaries]
+
+    assert summary_ids == [test_perf_alert_summary.id]
+
+
+def test_alert_summaries_filter_by_status(
+    client, test_perf_alert_summary, test_perf_alert_summary_2
+):
+    test_perf_alert_summary.status = PerformanceAlertSummary.UNTRIAGED
+    test_perf_alert_summary.save()
+
+    test_perf_alert_summary_2.status = PerformanceAlertSummary.INVALID
+    test_perf_alert_summary_2.save()
+
+    resp = client.get(
+        reverse("performance-alert-summaries-list"),
+        data={"status": PerformanceAlertSummary.INVALID},
+    )
+    assert resp.status_code == 200
+
+    retrieved_summaries = resp.json()["results"]
+    summary_ids = [summary["id"] for summary in retrieved_summaries]
+
+    assert summary_ids == [test_perf_alert_summary_2.id]
+
+
+def test_alert_summaries_filter_by_repository(
+    client,
+    test_perf_alert_summary,
+    test_perf_alert_summary_2,
+    test_repository,
+    try_repository,
+    try_push_stored,
+):
+    try_pushes = Push.objects.filter(repository=try_repository).order_by("id")
+    test_perf_alert_summary_2.repository = try_repository
+    test_perf_alert_summary_2.prev_push = try_pushes[0]
+    test_perf_alert_summary_2.push = try_pushes[1]
+    test_perf_alert_summary_2.save()
+
+    resp = client.get(
+        reverse("performance-alert-summaries-list"),
+        data={"repository": test_repository.id},
+    )
+    assert resp.status_code == 200
+
+    retrieved_summaries = resp.json()["results"]
+    summary_ids = [summary["id"] for summary in retrieved_summaries]
+
+    assert test_perf_alert_summary.id in summary_ids
+    assert test_perf_alert_summary_2.id not in summary_ids
+
+
+def test_alert_summaries_filter_by_series_signature(client, test_perf_alert_2):
+    resp = client.get(
+        reverse("performance-alert-summaries-list"),
+        data={"alerts__series_signature": test_perf_alert_2.series_signature_id},
+    )
+    assert resp.status_code == 200
+
+    summary_ids = [summary["id"] for summary in resp.json()["results"]]
+
+    assert summary_ids == [test_perf_alert_2.summary_id]
+
+
+@pytest.mark.parametrize(
+    "filter_target",
+    [
+        "suite",
+        "test",
+        "platform",
+        "extra_options",
+        "bug_number",
+        "revision",
+    ],
+)
+def test_alert_summaries_filter_text_matches_primary_alert_fields(
+    client,
+    test_perf_alert_summary,
+    test_perf_alert_summary_2,
+    test_perf_alert,
+    filter_target,
+):
+    test_perf_alert_summary.bug_number = 123456
+    test_perf_alert_summary.save()
+
+    signature = test_perf_alert.series_signature
+    filter_values = {
+        "suite": signature.suite,
+        "test": signature.test,
+        "platform": signature.platform.platform,
+        "extra_options": signature.extra_options,
+        "bug_number": str(test_perf_alert_summary.bug_number),
+        "revision": test_perf_alert_summary.push.revision,
+    }
+
+    resp = client.get(
+        reverse("performance-alert-summaries-list"),
+        data={
+            "framework": test_perf_alert_summary.framework_id,
+            "filter_text": filter_values[filter_target],
+        },
+    )
+    assert resp.status_code == 200
+
+    summary_ids = [summary["id"] for summary in resp.json()["results"]]
+
+    assert test_perf_alert_summary.id in summary_ids
+    assert test_perf_alert_summary_2.id not in summary_ids
+
+
+def test_alert_summaries_hide_improvements(
+    client,
+    test_perf_alert_summary,
+    test_perf_alert_summary_2,
+    test_perf_alert,
+    test_perf_alert_2,
+):
+    # ensure test_perf_alert_summary is an improvement summary
+    test_perf_alert.is_regression = False
+    test_perf_alert.save()
+
+    resp = client.get(
+        reverse("performance-alert-summaries-list"),
+        data={"hide_improvements": True},
+    )
+    assert resp.status_code == 200
+
+    retrieved_summaries = resp.json()["results"]
+    summary_ids = [summary["id"] for summary in retrieved_summaries]
+
+    assert test_perf_alert_summary.id not in summary_ids
+    assert test_perf_alert_summary_2.id in summary_ids
+    assert len(summary_ids) == 1
+
+
+@pytest.mark.parametrize(
+    "excluded_status",
+    [
+        PerformanceAlertSummary.DOWNSTREAM,
+        PerformanceAlertSummary.REASSIGNED,
+        PerformanceAlertSummary.INVALID,
+    ],
+)
+def test_alert_summaries_hide_related_and_invalid(
+    client,
+    excluded_status,
+    test_perf_alert_summary,
+    test_perf_alert_summary_2,
+):
+    test_perf_alert_summary.status = PerformanceAlertSummary.UNTRIAGED
+    test_perf_alert_summary.save()
+
+    test_perf_alert_summary_2.status = excluded_status
+    test_perf_alert_summary_2.save()
+
+    resp = client.get(
+        reverse("performance-alert-summaries-list"),
+        data={"hide_related_and_invalid": True},
+    )
+    assert resp.status_code == 200
+
+    retrieved_summaries = resp.json()["results"]
+    summary_ids = [summary["id"] for summary in retrieved_summaries]
+
+    assert test_perf_alert_summary.id in summary_ids
+    assert test_perf_alert_summary_2.id not in summary_ids
+
+
+def test_alert_summaries_filter_with_assignee(
+    client, test_perf_alert_summary, test_perf_alert_summary_2, test_user, test_sheriff
+):
+    test_perf_alert_summary.assignee = test_user
+    test_perf_alert_summary.save()
+
+    test_perf_alert_summary_2.assignee = test_sheriff
+    test_perf_alert_summary_2.save()
+
+    resp = client.get(
+        reverse("performance-alert-summaries-list"),
+        data={"with_assignee": test_user.username},
+    )
+    assert resp.status_code == 200
+
+    retrieved_summaries = resp.json()["results"]
+    summary_ids = [summary["id"] for summary in retrieved_summaries]
+
+    assert summary_ids == [test_perf_alert_summary.id]
